@@ -23,6 +23,7 @@ import { isScannable, scanSource, installScripts, OBFUSCATION_KINDS } from '../l
 const SKILL_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TRIPWIRE = path.join(SKILL_ROOT, 'lib', 'tripwire.cjs');
 const SHIMS_DIR = path.join(SKILL_ROOT, 'shims');
+const DECOYS_DIR = path.join(SKILL_ROOT, 'decoys');
 const CHAMBER_ROOT = process.env.CHAMBER_ROOT || path.join(os.tmpdir(), 'chamber');
 const NPM_CACHE = path.join(CHAMBER_ROOT, '.npm-cache');
 const ALLOWLIST = 'registry.npmjs.org,github.com,codeload.github.com,objects.githubusercontent.com';
@@ -123,17 +124,39 @@ function decoyValues(roomId) {
   };
 }
 
+// The decoy files to plant, as (HOME-relative path) → (inline fallback content). Templates with the
+// same relative path live under decoys/ and are preferred; the inline fallback keeps a room working
+// even if a template didn't make it into the sandbox clone.
+const DECOY_FILES = [
+  ['.npmrc', (d) => `//npm.pkg.github.com/:_authToken=${d.GITHUB_TOKEN}\n`],
+  ['.aws/credentials', (d) => `[default]\naws_access_key_id=${d.AWS_ACCESS_KEY_ID}\naws_secret_access_key=${d.AWS_SECRET_ACCESS_KEY}\n`],
+  ['.ssh/id_ed25519', (d) => `-----BEGIN OPENSSH PRIVATE KEY-----\nDECOY-${d.ROOM}-not-a-real-key\n-----END OPENSSH PRIVATE KEY-----\n`],
+  ['.config/gh/hosts.yml', (d) => `github.com:\n    oauth_token: ${d.GITHUB_TOKEN}\n    user: decoy\n`],
+];
+
 function plantDecoys(home, roomId) {
-  const d = decoyValues(roomId);
-  const write = (rel, content) => {
-    const p = path.join(home, rel);
-    fs.mkdirSync(path.dirname(p), { recursive: true });
-    fs.writeFileSync(p, content);
-  };
-  write('.npmrc', `//npm.pkg.github.com/:_authToken=${d.GITHUB_TOKEN}\n`);
-  write('.aws/credentials', `[default]\naws_access_key_id=${d.AWS_ACCESS_KEY_ID}\naws_secret_access_key=${d.AWS_SECRET_ACCESS_KEY}\n`);
-  write('.ssh/id_ed25519', `-----BEGIN OPENSSH PRIVATE KEY-----\nDECOY-${roomId}-not-a-real-key\n-----END OPENSSH PRIVATE KEY-----\n`);
-  write('.config/gh/hosts.yml', `github.com:\n    oauth_token: ${d.GITHUB_TOKEN}\n    user: decoy\n`);
+  const d = { ...decoyValues(roomId), ROOM: roomId };
+  for (const [rel, fallback] of DECOY_FILES) {
+    let content;
+    const tpl = path.join(DECOYS_DIR, rel);
+    try {
+      content = substituteDecoys(fs.readFileSync(tpl, 'utf8'), d);
+    } catch {
+      content = fallback(d); // template missing/unreadable: use the built-in
+    }
+    const dest = path.join(home, rel);
+    try {
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.writeFileSync(dest, content);
+    } catch (e) {
+      loge('decoy plant failed', rel, String(e && e.message));
+    }
+  }
+}
+
+// Replace {{NPM_TOKEN}}, {{GITHUB_TOKEN}}, {{AWS_ACCESS_KEY_ID}}, {{AWS_SECRET_ACCESS_KEY}}, {{ROOM}}.
+function substituteDecoys(text, d) {
+  return text.replace(/\{\{(\w+)\}\}/g, (m, key) => (key in d ? d[key] : m));
 }
 
 // Environment for install/test processes (§6). `mode` is enforce or monitor.
