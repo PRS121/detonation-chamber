@@ -784,8 +784,12 @@ const COMMANDS = {
   test: cmdTest,
   diff: cmdDiff,
   heal: cmdHeal,
-  // manifest: owned by C (lib/manifest.mjs)
+  manifest: cmdManifest, // owned by C; implemented in ./chamber-manifest.mjs (imported below)
 };
+
+// C's lane: register the manifest command. Imported after COMMANDS so the sibling module can reuse the
+// helpers exported at the bottom of this file (safe circular import: all cross-refs are used at call time).
+import { cmdManifest } from './chamber-manifest.mjs';
 
 function main() {
   const [, , cmd, ...rest] = process.argv;
