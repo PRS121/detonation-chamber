@@ -98,7 +98,7 @@ async function run(cmd: 'git' | 'npm', args: string[], cwd: string, secret?: str
     let detail = (errorLines.length ? errorLines : lines).join(' ');
     if (secret) detail = detail.split(secret).join('***');
     const subcommand = args.find((a) => /^[a-z]+$/.test(a)) ?? '';
-    throw new Error(`${cmd} ${subcommand} failed (${err.code ?? 'error'}): ${detail.slice(-300)}`);
+    throw new Error(`${cmd} ${subcommand} failed (${err.code ?? 'error'}): ${detail.slice(0, 300)}`);
   }
 }
 
