@@ -1,0 +1,20 @@
+{
+  "model": { "name": "${AGENT_MODEL}", "params": { "temperature": 0.1 } },
+  "instructions": "<replaced with agent/instructions.md by create-agent.ts>",
+  "mcp_servers": [
+    {
+      "name": "release-ops",
+      "enable_tools": ["@all"],
+      "require_approval_for_tools": ["@write", "@destructive", "commit_release_prep", "create_release", "publish_package"],
+      "preload": true
+    }
+  ],
+  "skills": [{ "name": "supply-chain-gate" }],
+  "config": {
+    "sandbox": { "enabled": true },
+    "generative_ui": { "enabled": true },
+    "ask_user_questions": { "enabled": true },
+    "dynamic_sub_agents": { "enabled": true },
+    "iteration_limit": 60
+  }
+}
