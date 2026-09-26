@@ -1,0 +1,29 @@
+# dependencies: never commit, `npm ci` rebuilds them from package-lock.json
+node_modules/
+
+# secrets: never commit (hackathon rule 5, and bots scrape public repos for keys within minutes)
+.env
+.env.*
+!.env.example
+*.pem
+.npmrc
+!skills/supply-chain-gate/decoys/**
+
+# TrueForge local data (run TrueForge from outside this folder anyway)
+.trueforge/
+*.sqlite
+*.sqlite3
+*.db
+
+# build / pack / logs
+*.tgz
+*.log
+coverage/
+tmp/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/

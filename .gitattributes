@@ -1,0 +1,9 @@
+# Sandbox scripts run on Linux: keep LF everywhere, even when edited on Windows
+* text=auto eol=lf
+*.sh text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
+*.tgz binary
