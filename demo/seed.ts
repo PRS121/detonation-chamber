@@ -31,8 +31,9 @@ const TOKEN = required('GITHUB_TOKEN');
 const PKG = `@${SCOPE}/${REPO}`;
 const BASELINE = '1.3.0'; // the version everything resets to; rounds count from here
 
+const DRY = process.argv.includes('--dry-run');
 const octokit = new Octokit({ auth: TOKEN, userAgent: 'detonation-chamber-seed' });
-const log = (msg: string) => console.error(`[seed] ${msg}`);
+const log = (msg: string) => console.error(`[seed]${DRY ? ' (dry-run)' : ''} ${msg}`);
 
 const ROUNDS_DIR = fileURLToPath(new URL('./rounds', import.meta.url));
 
@@ -86,6 +87,10 @@ async function deleteTagsAfterBaseline() {
   for (const t of tags) {
     const p = parseSemver(t.name);
     if (!p || cmp(p, base) <= 0) continue;
+    if (DRY) {
+      log(`would delete tag + release ${t.name}`);
+      continue;
+    }
     try {
       const { data: rel } = await octokit.repos.getReleaseByTag({ owner: ORG, repo: REPO, tag: t.name });
       await octokit.repos.deleteRelease({ owner: ORG, repo: REPO, release_id: rel.id });
@@ -146,8 +151,11 @@ async function main() {
 
   // 1. reset main to the baseline commit
   const baseSha = await commitOfTag(baseTag);
-  await octokit.git.updateRef({ owner: ORG, repo: REPO, ref: 'heads/main', sha: baseSha, force: true });
-  log(`main reset to ${baseTag} (${baseSha.slice(0, 7)})`);
+  if (DRY) log(`would reset main to ${baseTag} (${baseSha.slice(0, 7)})`);
+  else {
+    await octokit.git.updateRef({ owner: ORG, repo: REPO, ref: 'heads/main', sha: baseSha, force: true });
+    log(`main reset to ${baseTag} (${baseSha.slice(0, 7)})`);
+  }
 
   // 2. clear rehearsal tags/releases above the baseline
   await deleteTagsAfterBaseline();
@@ -165,18 +173,23 @@ async function main() {
       const section = (json[c.bump.section] as Record<string, string> | undefined) ?? {};
       json[c.bump.section] = { ...section, [c.bump.name]: spec };
       entries = [{ path: 'package.json', mode: '100644', type: 'blob', content: JSON.stringify(json, null, 2) + '\n' }];
+      log(`  ${c.bump.section}.${c.bump.name} -> ${spec}`);
     } else {
       throw new Error(`round commit "${c.message}" has neither dir nor bump`);
     }
-    head = await makeCommit(head, c.message, entries);
-    created.push({ message: c.message.split('\n')[0], sha: head });
+    if (DRY) {
+      created.push({ message: c.message.split('\n')[0], sha: 'dry-run' });
+    } else {
+      head = await makeCommit(head, c.message, entries);
+      created.push({ message: c.message.split('\n')[0], sha: head });
+    }
   }
 
-  await octokit.git.updateRef({ owner: ORG, repo: REPO, ref: 'heads/main', sha: head, force: true });
+  if (!DRY) await octokit.git.updateRef({ owner: ORG, repo: REPO, ref: 'heads/main', sha: head, force: true });
 
-  log('done. commits on main:');
+  log(DRY ? 'plan (nothing was changed):' : 'done. commits on main:');
   for (const c of created) console.error(`  ${c.sha.slice(0, 7)}  ${c.message}`);
-  console.log(JSON.stringify({ repo: REPO, base_tag: baseTag, round: roundName, head_sha: head, commits: created.map((c) => c.sha.slice(0, 7)) }));
+  console.log(JSON.stringify({ repo: REPO, base_tag: baseTag, round: roundName, dry_run: DRY, head_sha: DRY ? null : head, commits: created.map((c) => c.sha.slice(0, 7)) }));
 }
 
 main().catch((e) => {

@@ -1,0 +1,9 @@
+{
+  "description": "chalk 5.4.1 -> 5.5.0 (real, SAFE, clean intel: no pulled versions in range) + color-helper v1.2.3 -> v1.2.4 (fixture, BLOCKED)",
+  "commits": [
+    { "message": "fix: expand ampersands to \"and\" before slugifying", "dir": "c1" },
+    { "message": "feat: add a prefix option", "dir": "c2" },
+    { "message": "chore(deps): bump chalk from 5.4.1 to 5.5.0", "bump": { "section": "dependencies", "name": "chalk", "to": "5.5.0" } },
+    { "message": "chore(deps): bump @quarantine-lab/color-helper from v1.2.3 to v1.2.4", "bump": { "section": "devDependencies", "name": "@quarantine-lab/color-helper", "to": "github:$ORG/color-helper#v1.2.4" } }
+  ]
+}
