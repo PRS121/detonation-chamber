@@ -69,8 +69,9 @@ function nextVersion(base: string, messages: string[]): string {
   return semver.bump(base, level);
 }
 
-const SECTIONS = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'] as const;
-type PackageJson = Partial<Record<(typeof SECTIONS)[number], Record<string, string>>>;
+export const SECTIONS = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'] as const;
+export type Section = (typeof SECTIONS)[number];
+type PackageJson = Partial<Record<Section, Record<string, string>>>;
 
 export async function getDependencyChanges(gh: GitHub, repo: string, base: string, head: string) {
   const [before, after] = await Promise.all([readPackageJson(gh, repo, base), readPackageJson(gh, repo, head)]);
@@ -89,10 +90,15 @@ export async function getDependencyChanges(gh: GitHub, repo: string, base: strin
 }
 
 async function readPackageJson(gh: GitHub, repo: string, ref: string): Promise<PackageJson | null> {
+  const text = await readFileAt(gh, repo, 'package.json', ref);
+  return text === null ? null : (JSON.parse(text) as PackageJson);
+}
+
+export async function readFileAt(gh: GitHub, repo: string, path: string, ref: string): Promise<string | null> {
   try {
-    const { data } = await gh.octokit.repos.getContent({ owner: gh.org, repo, path: 'package.json', ref });
-    if (Array.isArray(data) || data.type !== 'file' || !('content' in data)) throw new Error(`package.json in ${repo} at ${ref} is not a file`);
-    return JSON.parse(Buffer.from(data.content, 'base64').toString('utf8')) as PackageJson;
+    const { data } = await gh.octokit.repos.getContent({ owner: gh.org, repo, path, ref });
+    if (Array.isArray(data) || data.type !== 'file' || !('content' in data)) throw new Error(`${path} in ${repo} at ${ref} is not a file`);
+    return Buffer.from(data.content, 'base64').toString('utf8');
   } catch (e) {
     if ((e as { status?: number }).status === 404) return null;
     throw e;

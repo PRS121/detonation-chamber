@@ -4,8 +4,10 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { Octokit } from '@octokit/rest';
 import { z } from 'zod';
-import { getDependencyChanges, getReleaseContext, type GitHub } from './github.ts';
+import { getDependencyChanges, getReleaseContext, SECTIONS, type GitHub } from './github.ts';
 import { getPackageIntel } from './npm.ts';
+import { publishPackage, type PublishMode } from './publish.ts';
+import { commitReleasePrep, createRelease } from './release.ts';
 
 const log = (msg: string) => console.error(`[release-ops ${new Date().toISOString().slice(11, 19)}] ${msg}`);
 const env = (name: string) => process.env[name]?.trim() || undefined;
@@ -27,6 +29,12 @@ if (SECRET.length < 16 || SECRET.startsWith('<')) {
 const ORG = required('GH_ORG');
 const GITHUB_TOKEN = env('GITHUB_TOKEN');
 if (!GITHUB_TOKEN) log('GITHUB_TOKEN is not set: GitHub reads are anonymous (60 requests/hour) and writes will fail.');
+const PUBLISH_MODE = (env('PUBLISH_MODE') ?? 'dry-run') as PublishMode;
+if (PUBLISH_MODE !== 'dry-run' && PUBLISH_MODE !== 'live') {
+  log('PUBLISH_MODE must be "dry-run" or "live".');
+  process.exit(1);
+}
+const publishConfig = { mode: PUBLISH_MODE, npmToken: env('NPM_TOKEN'), npmScope: env('NPM_SCOPE')?.replace(/^@/, '') };
 
 const gh: GitHub = { octokit: new Octokit({ auth: GITHUB_TOKEN, userAgent: 'detonation-chamber-release-ops' }), org: ORG };
 const secretDigest = createHash('sha256').update(SECRET).digest();
@@ -35,6 +43,9 @@ const repoName = z.string().regex(/^[A-Za-z0-9._-]{1,100}$/).describe(`Repositor
 const gitRef = z.string().regex(/^[A-Za-z0-9._/-]{1,200}$/).describe('Tag, branch or commit SHA');
 const npmName = z.string().max(214).regex(/^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/).describe('npm package name');
 const versionSpec = z.string().min(1).max(100);
+const sha = z.string().regex(/^[0-9a-fA-F]{7,40}$/).describe('Commit SHA');
+const releaseTag = z.string().regex(/^v\d+\.\d+\.\d+$/).describe('Release tag, e.g. v1.4.0');
+const markdown = z.string().min(1).max(20_000);
 
 function errorText(e: unknown): string {
   const status = (e as { status?: number } | null)?.status;
@@ -42,6 +53,7 @@ function errorText(e: unknown): string {
   if (status === 401) return 'GitHub rejected the token (401). Check GITHUB_TOKEN.';
   if (status === 403 || status === 429) return `GitHub refused the request (${status}): missing permission or rate limit.`;
   if (status === 404) return `Not found on GitHub: check the repo name and ref. (${message})`;
+  if (status === 409 || status === 422) return `GitHub rejected the change (${status}): ${message}`;
   return message;
 }
 
@@ -104,6 +116,64 @@ function buildServer(): McpServer {
     ({ name, from, to }) => run('get_package_intel', () => getPackageIntel(name, from ?? null, to)),
   );
 
+  server.registerTool(
+    'commit_release_prep',
+    {
+      title: 'Commit release prep',
+      description:
+        'Pushes ONE commit to the default branch that sets package.json "version", applies dependency pins and prepends ' +
+        'the release notes to CHANGELOG.md. Refuses if the branch moved past base_sha. Never runs npm. Returns the new commit sha.',
+      inputSchema: {
+        repo: repoName,
+        base_sha: sha.describe('head_sha from get_release_context; the commit must still be the branch head'),
+        version: z.string().regex(/^\d+\.\d+\.\d+$/).describe('New version without "v", e.g. 1.4.0'),
+        pins: z
+          .array(z.object({ section: z.enum(SECTIONS), name: npmName, spec: versionSpec.max(200) }))
+          .max(20)
+          .describe('Dependency pins from heal reports; [] when nothing was healed'),
+        changelog_md: markdown.describe('Release notes to prepend to CHANGELOG.md'),
+        message: z.string().min(1).max(500).describe('Commit message, e.g. "chore(release): v1.4.0"'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    (input) => run('commit_release_prep', () => commitReleasePrep(gh, input)),
+  );
+
+  server.registerTool(
+    'create_release',
+    {
+      title: 'Create tag and GitHub release',
+      description:
+        'Creates the tag at target_sha and a GitHub release with the notes. Refuses unless package.json at target_sha ' +
+        'already has the tag\'s version (run commit_release_prep first). Tags are permanent for the release history.',
+      inputSchema: { repo: repoName, tag: releaseTag, target_sha: sha, title: z.string().min(1).max(200), notes_md: markdown },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    },
+    (input) => run('create_release', () => createRelease(gh, input)),
+  );
+
+  server.registerTool(
+    'publish_package',
+    {
+      title: 'Publish to npm',
+      description:
+        `Clean-clones the tag, checks package.json matches it, recomputes the manifest of every packed file and refuses if it ` +
+        `differs from expected_manifest_sha256, then publishes with install scripts off. Current mode: ${PUBLISH_MODE}. ` +
+        'A live publish can never be undone and requires expected_manifest_sha256.',
+      inputSchema: {
+        repo: repoName,
+        tag: releaseTag,
+        expected_manifest_sha256: z
+          .string()
+          .regex(/^[0-9a-fA-F]{64}$/)
+          .optional()
+          .describe('manifest_sha256 from the chamber manifest command on the release commit'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    },
+    (input) => run('publish_package', () => publishPackage(gh, input, publishConfig)),
+  );
+
   return server;
 }
 
@@ -140,4 +210,4 @@ const http = createServer(async (req, res) => {
   }
 });
 
-http.listen(PORT, '127.0.0.1', () => log(`listening on http://127.0.0.1:${PORT}/mcp for org ${ORG}`));
+http.listen(PORT, '127.0.0.1', () => log(`listening on http://127.0.0.1:${PORT}/mcp for org ${ORG}, publish mode ${PUBLISH_MODE}`));

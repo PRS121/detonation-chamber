@@ -50,9 +50,9 @@ Server: `127.0.0.1:8787/mcp`, stateless. Requires header `x-release-ops-key: $MC
 | `get_release_context` | readOnly | `{repo}` | `{repo, clone_url, default_branch, last_tag, last_tag_sha, head_sha, commits:[{sha7, subject, author, date}], suggested_next_version}` |
 | `get_dependency_changes` | readOnly | `{repo, base, head}` | `{changes:[{name, section, from, to, kind:"npm"\|"git"}]}` (compares package.json at the two refs) |
 | `get_package_intel` | readOnly | `{name, from, to}` (npm only) | `{name, from, to, to_published_at, age_hours, publisher, maintainers_changed, has_provenance, deprecated, removed_versions_in_range:[{version, published_at}]}` |
-| `commit_release_prep` | readOnly:false | `{repo, base_sha, version, pins:[{section, name, spec}], changelog_md, message}` | `{commit_sha, url}`. Edits package.json (version + pins) and prepends CHANGELOG.md through the GitHub contents API. Never runs npm. Fails if `main` moved past `base_sha`. |
+| `commit_release_prep` | readOnly:false | `{repo, base_sha, version, pins:[{section, name, spec}], changelog_md, message}` | `{commit_sha, url}`. Edits package.json (version + pins) and prepends CHANGELOG.md in **one** commit (GitHub Git Data API). Never runs npm. Fails if `main` moved past `base_sha`. |
 | `create_release` | destructive | `{repo, tag, target_sha, title, notes_md}` | `{tag, release_url}` |
-| `publish_package` | destructive | `{repo, tag, expected_manifest_sha256}` | `{mode:"live"\|"dry-run", name, version, npm_url, manifest_sha256, matched}`; refuses on mismatch |
+| `publish_package` | destructive | `{repo, tag, expected_manifest_sha256?}` | `{mode:"live"\|"dry-run", name, version, npm_url, manifest_sha256, matched, note?}`; refuses on mismatch. The hash is required in live mode; a dry-run without it (or before `manifest.mjs` exists) returns `matched:null` and a `note`. Live also refuses packages outside `@$NPM_SCOPE`. |
 | `open_security_advisory` (P2) | readOnly:false | `{repo, title, body_md}` | `{issue_url}` |
 
 Notes:
@@ -80,7 +80,9 @@ non-zero only for crashes (the agent then treats it as INCONCLUSIVE).
 | `manifest` | `--repo --ref <sha>` | Clone exact commit; `npm pack --dry-run --json --ignore-scripts` for the file list; `lib/manifest.mjs` | `{name, version, files, manifest_sha256}` |
 | `sweep` (P1) | none | Compare sandbox-wide persistence spots (`~/.bashrc`, `/tmp` outside chamber, global npm prefix, crontab) to the baseline taken at bootstrap | `{clean, changes:[…]}` |
 
-`lib/manifest.mjs` (zero deps, imported by the host too): for each packed file path (sorted), line
+`lib/manifest.mjs` (zero deps, imported by the host too) exports
+`computeManifest(dir, files) → {manifest_sha256, …}` (sync or async), where `files` are the `path` values from
+`npm pack --dry-run --json --ignore-scripts` run in `dir`; the function sorts them itself. For each packed file path (sorted), line
 `<sha256 of bytes>  <path>`; `manifest_sha256` = sha256 of the joined lines. File contents only, never modes,
 so Windows and Linux agree. Both sides clone with `core.autocrlf=false`.
 
