@@ -97,3 +97,7 @@ reviewing the MCP server, the chamber CLI, the deterministic rules, the demo too
 TrueForge agent that runs the release itself is driven by an OpenAI model (partner credits) with Gemini as
 backup, configured in the TrueForge UI. Every teammate can explain every component; the AI wrote code under
 review, not unattended.
+
+## License
+
+[MIT](LICENSE)
