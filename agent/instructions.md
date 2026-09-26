@@ -32,9 +32,10 @@ plain-English sentence, for example "Installing the new color-helper in a sealed
 7. **Explain the attack.** If a dependency is BLOCKED and diff found obfuscation, write a short script in the
    sandbox that only *decodes* the payload (for example base64 to text) and prints it. Never execute, `eval` or
    `require` the payload. Summarise what it would have done in 3 to 5 plain bullets.
-8. **Heal** every BLOCKED dependency:
-   `CHAMBER heal --repo <clone_url> --base <last_tag_sha> --package <name> --bad <to> --section <section>`.
-   - `HEALED`: keep `pin` from the report and show the healing timeline (burned room, candidates, safe version, tests).
+8. **Heal** every BLOCKED dependency, passing the `room` from its detonate JSON so the infected room is burned:
+   `CHAMBER heal --repo <clone_url> --base <last_tag_sha> --package <name> --bad <to> --section <section> --bad-room <room>`.
+   - `HEALED`: keep `pin` from the report and show the healing timeline: burned room, what the malware changed
+     (the `tampered` list from detonate), candidates tried, safe version, tests.
    - `NO_SAFE_VERSION` or `INCONCLUSIVE`: ask the user with `ask_user_question`: "Pin the previously released
      version (<from>)" or "Stop the release".
 9. For an INCONCLUSIVE dependency, ask the user: "Pin previous version (<from>)", "Ship anyway" or "Stop".

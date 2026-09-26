@@ -128,7 +128,8 @@ in the same commit as the code.
 npm ci                                  # workspace deps
 npx @truefoundry/trueforge@0.2.1        # run from a folder OUTSIDE this repo
 npm run mcp                             # release-ops on http://127.0.0.1:8787/mcp
-npm run agent:sync                      # create/update the TrueForge agent from agent/*
+npm run agent:sync                      # create/update the TrueForge agent from agent/* (rehearsal model)
+npm run agent:sync:demo                 # same, with AGENT_MODEL_DEMO for the judged demo
 npm run demo:seed                       # reset tiny-slugify to the last published tag + push this round's 4 commits
 npm run typecheck                       # tsc over mcp/, agent/, demo/ (tsx itself does not type-check)
 ```
