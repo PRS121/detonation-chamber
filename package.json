@@ -11,12 +11,15 @@
   "scripts": {
     "mcp": "tsx --env-file-if-exists=.env mcp/release-ops/src/server.ts",
     "agent:sync": "tsx --env-file-if-exists=.env agent/create-agent.ts",
-    "demo:seed": "tsx --env-file-if-exists=.env demo/seed.ts"
+    "demo:seed": "tsx --env-file-if-exists=.env demo/seed.ts",
+    "typecheck": "tsc -p ."
   },
   "dependencies": {
     "@truefoundry/trueforge-sdk": "0.2.0"
   },
   "devDependencies": {
-    "tsx": "4.23.15"
+    "@types/node": "22.20.4",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
   }
 }

@@ -229,7 +229,7 @@ decoy-in-payload check, and INCONCLUSIVE as the default. Production version: sys
   `publishConfig: {access: "public"}`. `.gitattributes`: `* text=auto eol=lf`.
 - No lockfile (a library; keeps the demo deterministic). Lockfile support is roadmap.
 - Baseline: tag `v1.3.0`, published live once during M1 (with `--ignore-scripts`, from a clean clone).
-- `npm run demo:seed` (host, Node):
+- `npm run demo:seed` (host, TypeScript file `demo/seed.ts` run by `tsx`; the root script already points there):
   1. latest published version from `npm view @$NPM_SCOPE/tiny-slugify version` → base tag `v<that>`;
   2. force-push `main` of **tiny-slugify only** back to that tag; delete newer tags and GitHub releases
      (rehearsals that never reached npm);
