@@ -40,7 +40,8 @@ plain-English sentence, for example "Installing the new color-helper in a sealed
 9. For an INCONCLUSIVE dependency, ask the user: "Pin previous version (<from>)", "Ship anyway" or "Stop".
 10. **Test** with every pin applied:
     `CHAMBER test --repo <clone_url> --ref <head_sha> --pin <name>=<spec> ...` (one `--pin` per pin).
-    Continue only if `failed` is 0 and the verdict is not BLOCKED.
+    Continue only if `failed` is 0, `exit_code` is 0 and the verdict is not BLOCKED. `passed: null` means the
+    tests never ran.
 11. **Version and notes.** Use `suggested_next_version` and say why in one line. Write the notes in Markdown:
     `## v<version>`, then `### Features`, `### Fixes`, `### Security` (always present: one line per changed
     dependency with its verdict and key evidence, plus what was blocked and how it was healed) and
