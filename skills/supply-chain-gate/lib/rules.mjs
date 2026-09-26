@@ -21,6 +21,23 @@ function isNpmActor(ev) {
   return ev && ev.actor && ev.actor.pkg === 'npm';
 }
 
+const INSTALL_LIFECYCLES = new Set(['preinstall', 'install', 'postinstall', 'prepare', 'prepublish']);
+
+// HONEYTOKEN_READ means *untrusted package code* read a decoy. A read counts as untrusted when it
+// comes from a real node_modules frame, OR during an install-time lifecycle script (postinstall &c).
+// It does NOT count for the npm CLI (legitimate ~/.npmrc), for the project's own code, or for reads
+// with no package frame during `test` / other non-install phases — those are the project and Node's
+// own runtime (test runner, module loader) legitimately touching the environment they run in.
+function isUntrustedReader(ev) {
+  if (!ev || !ev.actor) return false;
+  if (ev.actor.pkg === 'npm') return false;
+  if (ev.actor.pkg === 'project') return false;
+  const frame = ev.actor.frame || '';
+  if (frame.includes('/node_modules/')) return true; // a dependency's own code on the stack
+  if (ev.actor.lifecycle && INSTALL_LIFECYCLES.has(ev.actor.lifecycle)) return true; // dep install hook
+  return false;
+}
+
 // A finding key = rule + actor string, so we de-duplicate repeated hits from the same actor.
 function actorStr(ev) {
   if (!ev || !ev.actor) return 'unknown';
@@ -60,12 +77,12 @@ export function evaluate(input) {
     const actor = actorStr(ev);
     const type = ev.type;
 
-    // HONEYTOKEN_READ: decoy env read or decoy-file read under room HOME.
-    // npm's own reads of ~/.npmrc are legitimate -> exempt npm actor here (but not for TAMPER).
-    if (type === 'env_read' && ev.decoy_hit && !isNpmActor(ev)) {
+    // HONEYTOKEN_READ: decoy env read or decoy-file read under room HOME, by untrusted package code
+    // (a dependency / install hook) — not the npm CLI, the project itself, or Node's own runtime.
+    if (type === 'env_read' && ev.decoy_hit && isUntrustedReader(ev)) {
       add('HONEYTOKEN_READ', 'critical', actor, redactDetail(ev.detail));
     }
-    if (type === 'fs_read' && !isNpmActor(ev)) {
+    if (type === 'fs_read' && isUntrustedReader(ev)) {
       add('HONEYTOKEN_READ', 'critical', actor, `read ${basename(ev.detail)}`);
     }
 

@@ -320,8 +320,33 @@ function installFsHooks() {
   }
 }
 
-// ---- env Proxy (honeytoken env reads + enumeration) -------------------------
+// True when THIS process is the npm CLI itself (not a lifecycle-script child).
+// npm's config layer is hostile to a process.env Proxy (it silently exits 1), but the
+// package's own postinstall runs in a separate plain node process that tolerates it fine —
+// and that child is where honeytoken env reads actually happen. So we install the env Proxy
+// everywhere EXCEPT the npm CLI process.
+function isNpmCliProcess() {
+  try {
+    const a1 = (process.argv[1] || '').replace(/\\/g, '/');
+    // Match both the sandbox shape (.../bin/npm-cli.js — confirmed in TrueForge's image, SPEC §10)
+    // and host wrapper shapes (/usr/local/bin/npm, .../npm, npx). We are the npm CLI when argv[1]'s
+    // basename is npm/npx (with or without a .js/-cli suffix) or the path is inside an npm install.
+    const base = a1.split('/').pop() || '';
+    if (/^(npm|npx)$/.test(base)) return true;
+    if (/^(npm-cli|npx-cli)\.js$/.test(base)) return true;
+    if (/\/node_modules\/npm\//.test(a1)) return true;
+    if (process.env.npm_execpath && /(npm-cli\.js|\/npm)$/.test(process.env.npm_execpath) && !process.env.npm_lifecycle_event) {
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+// ---- env Proxy (honeytoken env reads) ---------------------------------------
 function installEnvProxy() {
+  if (isNpmCliProcess()) return; // see isNpmCliProcess: the Proxy breaks npm's own config layer
   try {
     const real = process.env;
     const isDecoyKey = (k) => {
@@ -332,6 +357,14 @@ function installEnvProxy() {
         return false;
       }
     };
+    // Minimal, invariant-safe Proxy: only a `get` trap (logs decoy reads) plus a
+    // `getOwnPropertyDescriptor` trap that forces configurable:true. process.env reports its
+    // keys as non-configurable; when code does {...process.env}, the spread calls
+    // getOwnPropertyDescriptor per key, and a non-configurable descriptor on a Proxy trips the
+    // invariant and throws OUTSIDE our try/catch (this silently killed npm). Forcing
+    // configurable:true keeps every Proxy invariant satisfied. No `ownKeys` trap: enumeration is
+    // not a rule, and trapping it is the other invariant hazard. Decoy env reads that matter are
+    // also caught downstream by DECOY_EXFIL when the value leaves the room.
     const proxy = new Proxy(real, {
       get(target, prop, recv) {
         try {
@@ -343,13 +376,10 @@ function installEnvProxy() {
         }
         return Reflect.get(target, prop, recv);
       },
-      ownKeys(target) {
-        try {
-          log('env_enum', 'enumerated process.env', null);
-        } catch {
-          /* ignore */
-        }
-        return Reflect.ownKeys(target);
+      getOwnPropertyDescriptor(target, prop) {
+        const d = Reflect.getOwnPropertyDescriptor(target, prop);
+        if (d) d.configurable = true;
+        return d;
       },
     });
     // Node rejects getter descriptors on process.env but allows reassigning the property itself.
