@@ -47,20 +47,34 @@ function trimForBudget(obj) {
 }
 
 // ---------------------------------------------------------------------------
-// arg parsing: --flag value, and boolean --run-tests
+// arg parsing: --flag value, --flag=value, boolean --run-tests.
+// --pin is repeatable (`test --pin a=1 --pin b=2`) and always comes back as an array.
 // ---------------------------------------------------------------------------
 function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith('--')) continue;
-    const key = a.slice(2);
-    const next = argv[i + 1];
-    if (next === undefined || next.startsWith('--')) {
-      out[key] = true;
+    let key = a.slice(2);
+    let value;
+    const eq = key.indexOf('=');
+    if (eq !== -1) {
+      value = key.slice(eq + 1);
+      key = key.slice(0, eq);
     } else {
-      out[key] = next;
-      i++;
+      const next = argv[i + 1];
+      if (next === undefined || next.startsWith('--')) {
+        value = true;
+      } else {
+        value = next;
+        i++;
+      }
+    }
+    if (key === 'pin') {
+      out.pin = out.pin || [];
+      out.pin.push(value);
+    } else {
+      out[key] = value;
     }
   }
   return out;
@@ -166,20 +180,33 @@ function run(cmd, args, opts = {}) {
 }
 
 // git clone at a ref, autocrlf off, shallow. Returns {ok, error}.
+// GIT_TERMINAL_PROMPT=0: a private or mistyped repo fails fast instead of waiting for a password.
+const GIT_ENV = { ...process.env, GIT_TERMINAL_PROMPT: '0' };
 function cloneAt(repoUrl, ref, dest) {
-  // --branch accepts tags and branch names; for a bare sha we clone default then checkout.
-  const r = run('git', ['-c', 'core.autocrlf=false', 'clone', '--depth', '1', '--branch', ref, repoUrl, dest], {
-    timeout: STEP_TIMEOUT_MS,
-  });
-  if (r.exit_code === 0) return { ok: true };
-  // fallback: full-ish clone then checkout the ref (handles a commit sha)
-  loge('shallow branch clone failed, retrying with checkout:', r.stderr.slice(0, 200));
-  fs.rmSync(dest, { recursive: true, force: true });
-  const c = run('git', ['-c', 'core.autocrlf=false', 'clone', repoUrl, dest], { timeout: STEP_TIMEOUT_MS });
-  if (c.exit_code !== 0) return { ok: false, error: c.stderr.slice(0, 200) || c.error };
-  const co = run('git', ['-C', dest, '-c', 'core.autocrlf=false', 'checkout', ref], { timeout: 30000 });
-  if (co.exit_code !== 0) return { ok: false, error: co.stderr.slice(0, 200) || co.error };
+  // Tags and branches: shallow clone. Commit shas (the agent's usual input) can't go through
+  // --branch, so they skip straight to a full clone + checkout.
+  if (!/^[0-9a-f]{7,40}$/i.test(ref)) {
+    const r = run('git', ['-c', 'core.autocrlf=false', 'clone', '--quiet', '--depth', '1', '--branch', ref, repoUrl, dest], {
+      timeout: STEP_TIMEOUT_MS,
+      env: GIT_ENV,
+    });
+    if (r.exit_code === 0) return { ok: true };
+    loge('shallow clone of', ref, 'failed, retrying with a full clone:', gitError(r));
+    fs.rmSync(dest, { recursive: true, force: true });
+  }
+  const c = run('git', ['-c', 'core.autocrlf=false', 'clone', '--quiet', repoUrl, dest], { timeout: STEP_TIMEOUT_MS, env: GIT_ENV });
+  if (c.exit_code !== 0) return { ok: false, error: gitError(c) };
+  const co = run('git', ['-C', dest, '-c', 'core.autocrlf=false', 'checkout', '--quiet', ref], { timeout: 30000, env: GIT_ENV });
+  if (co.exit_code !== 0) return { ok: false, error: gitError(co) };
   return { ok: true };
+}
+
+// The line of git's stderr that says what went wrong, without the "Cloning into '<path>'" noise.
+function gitError(res) {
+  if (res.timedOut) return 'git timed out';
+  const lines = String(res.stderr || '').split('\n').map((l) => l.trim()).filter(Boolean);
+  const fatal = lines.find((l) => l.startsWith('fatal:') || l.startsWith('error:'));
+  return (fatal || lines[lines.length - 1] || res.error || 'git failed').slice(0, 200);
 }
 
 // Set exactly one dependency in package.json to `spec`, in `section`.
@@ -234,7 +261,8 @@ function cmdDetonate(args) {
 
   const cl = cloneAt(repo, base, projectDir);
   if (!cl.ok) {
-    emit({ cmd: 'detonate', room: roomId, package: pkgName, verdict: 'INCONCLUSIVE', severity: 'high', summary: `clone failed: ${cl.error}`, findings: [{ rule: 'LOG_MISSING', severity: 'high', actor: 'chamber', detail: 'could not clone target' }], network: [], tampered: [], install: { exit_code: 1, duration_ms: 0 }, tests: { ran: false }, log_ok: false });
+    // Nothing was installed, so nothing was observed: INCONCLUSIVE, never SAFE.
+    emit({ cmd: 'detonate', room: roomId, package: pkgName, to, verdict: 'INCONCLUSIVE', severity: 'high', summary: `could not clone ${repo} at ${base}`, error: `clone failed: ${cl.error}`, findings: [], network: [], tampered: [], install: { exit_code: null, duration_ms: 0 }, tests: { ran: false }, log_ok: false });
     return 0;
   }
 
@@ -270,9 +298,10 @@ function cmdDetonate(args) {
   let testTiming = null;
   if (args['run-tests']) {
     loge(`[${roomId}] npm test under tripwire`);
-    const t = run('npm', ['test', '--silent'], { cwd: projectDir, env, timeout: STEP_TIMEOUT_MS });
+    const t = run('npm', ['test'], { cwd: projectDir, env, timeout: STEP_TIMEOUT_MS });
     testTiming = t.duration_ms;
-    tests = { ran: true, exit_code: t.exit_code, duration_ms: t.duration_ms, timedOut: t.timedOut };
+    const counts = parseNodeTestCounts(t.stdout + '\n' + t.stderr, t.exit_code);
+    tests = { ran: true, passed: counts.passed, failed: counts.failed, exit_code: t.exit_code, duration_ms: t.duration_ms };
   }
 
   const { events, logOk } = readEvents(room);
@@ -318,7 +347,8 @@ function cmdTest(args) {
 
   const cl = cloneAt(repo, ref, projectDir);
   if (!cl.ok) {
-    emit({ cmd: 'test', room: roomId, passed: 0, failed: 0, duration_ms: 0, verdict: 'INCONCLUSIVE', findings: [{ rule: 'LOG_MISSING', severity: 'high', actor: 'chamber', detail: `clone failed: ${cl.error}` }] });
+    // Tests never ran: null counts, so "failed is 0" can't be mistaken for a pass.
+    emit({ cmd: 'test', room: roomId, ref, passed: null, failed: null, duration_ms: 0, verdict: 'INCONCLUSIVE', error: `clone failed: ${cl.error}`, findings: [] });
     return 0;
   }
 
@@ -346,9 +376,13 @@ function cmdTest(args) {
   emit({
     cmd: 'test',
     room: roomId,
+    ref,
+    pins: args.pin || [],
     passed,
     failed,
+    exit_code: t.exit_code,
     duration_ms: t.duration_ms,
+    install: { exit_code: install.exit_code, duration_ms: install.duration_ms },
     verdict: verdict.verdict,
     findings: verdict.findings.slice(0, 8),
   });
@@ -375,12 +409,13 @@ function applyPins(projectDir, pin) {
   }
 }
 
-// node --test summary lines: "# pass N", "# fail N". Fallback to exit code if not found.
+// node --test summary lines: "# pass N" (tap reporter) or "ℹ pass N" (spec reporter).
+// Fallback to the exit code if neither is found.
 function parseNodeTestCounts(output, exitCode) {
   let passed = 0;
   let failed = 0;
-  const pass = output.match(/#\s*pass\s+(\d+)/);
-  const fail = output.match(/#\s*fail\s+(\d+)/);
+  const pass = output.match(/(?:#|ℹ)\s*pass\s+(\d+)/);
+  const fail = output.match(/(?:#|ℹ)\s*fail\s+(\d+)/);
   if (pass) passed = parseInt(pass[1], 10);
   if (fail) failed = parseInt(fail[1], 10);
   if (!pass && !fail) {
