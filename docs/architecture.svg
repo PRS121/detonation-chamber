@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <rect x="0" y="0" width="960" height="560" fill="#ffffff"/>
+  <text x="480" y="34" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">Detonation Chamber — trust boundary</text>
+
+  <!-- panels -->
+  <rect x="24" y="56" width="440" height="480" rx="12" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <rect x="496" y="56" width="440" height="480" rx="12" fill="#fef2f2" stroke="#fecaca"/>
+  <text x="244" y="82" text-anchor="middle" font-size="15" font-weight="700" fill="#334155">HOST (demo laptop)</text>
+  <text x="716" y="82" text-anchor="middle" font-size="15" font-weight="700" fill="#b91c1c">DAYTONA SANDBOX (disposable)</text>
+  <text x="244" y="100" text-anchor="middle" font-size="11" fill="#64748b">real secrets live here</text>
+  <text x="716" y="100" text-anchor="middle" font-size="11" fill="#dc2626">strangers' code runs here — nothing secret</text>
+
+  <!-- trust boundary -->
+  <line x1="480" y1="60" x2="480" y2="532" stroke="#0f172a" stroke-width="2" stroke-dasharray="7 6"/>
+  <text x="480" y="552" text-anchor="middle" font-size="11" font-style="italic" fill="#0f172a">secrets and strangers' code never meet</text>
+
+  <!-- HOST: TrueForge -->
+  <rect x="48" y="116" width="392" height="132" rx="9" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="64" y="138" font-size="13" font-weight="700" fill="#0f172a">TrueForge 0.2.1  ·  localhost:8790</text>
+  <text x="64" y="158" font-size="11" fill="#475569">owns the LLM loop, approvals, subagents, chat UI</text>
+  <rect x="64" y="168" width="168" height="64" rx="7" fill="#eef2ff" stroke="#a5b4fc"/>
+  <text x="148" y="192" text-anchor="middle" font-size="12" font-weight="700" fill="#3730a3">agent</text>
+  <text x="148" y="210" text-anchor="middle" font-size="11" fill="#4338ca">"release-captain"</text>
+  <rect x="248" y="168" width="176" height="64" rx="7" fill="#e0f2fe" stroke="#7dd3fc"/>
+  <text x="336" y="192" text-anchor="middle" font-size="12" font-weight="700" fill="#075985">built-in tool: exec</text>
+  <text x="336" y="210" text-anchor="middle" font-size="11" fill="#0369a1">runs commands in sandbox</text>
+
+  <!-- HOST: MCP server -->
+  <rect x="48" y="270" width="392" height="96" rx="9" fill="#ffffff" stroke="#94a3b8"/>
+  <text x="64" y="292" font-size="13" font-weight="700" fill="#0f172a">release-ops MCP  ·  127.0.0.1:8787/mcp</text>
+  <text x="64" y="312" font-size="11" fill="#475569">holds GITHUB_TOKEN + NPM_TOKEN (header auth)</text>
+  <text x="64" y="330" font-size="11" fill="#475569">destructive tools → human approval in TrueForge</text>
+  <text x="64" y="350" font-size="10.5" fill="#64748b">context · dep-changes · intel · commit · release · publish</text>
+
+  <!-- external services -->
+  <rect x="48" y="392" width="188" height="120" rx="9" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text x="142" y="416" text-anchor="middle" font-size="12" font-weight="700" fill="#065f46">GitHub API</text>
+  <text x="142" y="436" text-anchor="middle" font-size="11" fill="#047857">commits, tags, releases</text>
+  <rect x="252" y="392" width="188" height="120" rx="9" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text x="346" y="416" text-anchor="middle" font-size="12" font-weight="700" fill="#065f46">npm registry</text>
+  <text x="346" y="436" text-anchor="middle" font-size="11" fill="#047857">publish @saurav121/*</text>
+  <line x1="142" y1="366" x2="142" y2="392" stroke="#334155" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="346" y1="366" x2="346" y2="392" stroke="#334155" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- SANDBOX: skill -->
+  <rect x="520" y="116" width="392" height="118" rx="9" fill="#ffffff" stroke="#fca5a5"/>
+  <text x="536" y="138" font-size="13" font-weight="700" fill="#0f172a">skill: supply-chain-gate</text>
+  <text x="536" y="157" font-size="11" fill="#475569">/opt/tf/skills/supply-chain-gate — zero npm deps</text>
+  <rect x="536" y="168" width="360" height="52" rx="7" fill="#fff7ed" stroke="#fdba74"/>
+  <text x="716" y="189" text-anchor="middle" font-size="12" font-weight="700" fill="#9a3412">chamber.mjs</text>
+  <text x="716" y="208" text-anchor="middle" font-size="11" fill="#c2410c">detonate · diff · heal · test · manifest</text>
+
+  <!-- SANDBOX: room -->
+  <rect x="520" y="252" width="392" height="200" rx="9" fill="#ffffff" stroke="#fca5a5"/>
+  <text x="536" y="274" font-size="13" font-weight="700" fill="#0f172a">room  /tmp/chamber/&lt;room&gt;/</text>
+  <rect x="536" y="286" width="174" height="54" rx="7" fill="#fee2e2" stroke="#f87171"/>
+  <text x="623" y="307" text-anchor="middle" font-size="11.5" font-weight="700" fill="#991b1b">decoy HOME</text>
+  <text x="623" y="324" text-anchor="middle" font-size="10.5" fill="#b91c1c">.npmrc .aws .ssh — honeytokens</text>
+  <rect x="722" y="286" width="174" height="54" rx="7" fill="#fee2e2" stroke="#f87171"/>
+  <text x="809" y="307" text-anchor="middle" font-size="11.5" font-weight="700" fill="#991b1b">tripwire (NODE_OPTIONS)</text>
+  <text x="809" y="324" text-anchor="middle" font-size="10.5" fill="#b91c1c">env · fs · net · child_process</text>
+  <rect x="536" y="350" width="174" height="54" rx="7" fill="#fee2e2" stroke="#f87171"/>
+  <text x="623" y="371" text-anchor="middle" font-size="11.5" font-weight="700" fill="#991b1b">shims curl/wget/nc</text>
+  <text x="623" y="388" text-anchor="middle" font-size="10.5" fill="#b91c1c">record + refuse</text>
+  <rect x="722" y="350" width="174" height="54" rx="7" fill="#fee2e2" stroke="#f87171"/>
+  <text x="809" y="371" text-anchor="middle" font-size="11.5" font-weight="700" fill="#991b1b">project copy + event log</text>
+  <text x="809" y="388" text-anchor="middle" font-size="10.5" fill="#b91c1c">integrity diff → rules</text>
+  <text x="716" y="428" text-anchor="middle" font-size="11" fill="#475569">network: npm · PyPI · GitHub only (Daytona firewall)</text>
+  <text x="716" y="444" text-anchor="middle" font-size="11" font-weight="700" fill="#b91c1c">deterministic verdict: SAFE / BLOCKED / INCONCLUSIVE</text>
+
+  <!-- exec crosses the boundary into the skill -->
+  <line x1="424" y1="200" x2="536" y2="200" stroke="#0369a1" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="480" y="192" text-anchor="middle" font-size="10" fill="#0369a1">exec</text>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+  </defs>
+</svg>

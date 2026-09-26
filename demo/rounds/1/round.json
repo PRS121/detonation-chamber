@@ -1,0 +1,9 @@
+{
+  "description": "debug 4.4.1 -> 4.4.3 (real, SAFE) + color-helper v1.2.3 -> v1.2.4 (fixture, BLOCKED)",
+  "commits": [
+    { "message": "fix: split camelCase boundaries into separate words", "dir": "c1" },
+    { "message": "feat: add a maxWords option", "dir": "c2" },
+    { "message": "chore(deps): bump debug from 4.4.1 to 4.4.3", "bump": { "section": "dependencies", "name": "debug", "to": "4.4.3" } },
+    { "message": "chore(deps): bump @quarantine-lab/color-helper from v1.2.3 to v1.2.4", "bump": { "section": "devDependencies", "name": "@quarantine-lab/color-helper", "to": "github:$ORG/color-helper#v1.2.4" } }
+  ]
+}
