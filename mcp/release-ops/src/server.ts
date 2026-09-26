@@ -10,7 +10,10 @@ import { publishPackage, type PublishMode } from './publish.ts';
 import { commitReleasePrep, createRelease } from './release.ts';
 
 const log = (msg: string) => console.error(`[release-ops ${new Date().toISOString().slice(11, 19)}] ${msg}`);
-const env = (name: string) => process.env[name]?.trim() || undefined;
+const env = (name: string) => {
+  const value = process.env[name]?.trim();
+  return value && !value.includes('<') ? value : undefined;
+};
 function required(name: string): string {
   const value = env(name);
   if (!value) {
@@ -22,7 +25,7 @@ function required(name: string): string {
 
 const PORT = Number(env('MCP_PORT') ?? 8787);
 const SECRET = required('MCP_SHARED_SECRET');
-if (SECRET.length < 16 || SECRET.startsWith('<')) {
+if (SECRET.length < 16) {
   log('MCP_SHARED_SECRET must be a real random string of at least 16 characters.');
   process.exit(1);
 }

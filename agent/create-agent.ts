@@ -17,7 +17,7 @@ function substitute(text: string, file: string): string {
   const missing = new Set<string>();
   const result = text.replace(/\$\{([A-Z0-9_]+)\}/g, (_, name: string) => {
     const value = process.env[name]?.trim();
-    if (!value || value.startsWith('<')) missing.add(name);
+    if (!value || value.includes('<')) missing.add(name);
     return value ?? '';
   });
   if (missing.size) fail(`${file} needs ${[...missing].join(', ')}: set ${missing.size > 1 ? 'them' : 'it'} in .env`);
