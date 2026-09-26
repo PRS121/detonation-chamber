@@ -7,7 +7,7 @@ the team, and update this file in the same commit as the code.
 |---|---|---|
 | 1 | Demo scenario | all |
 | 2 | release-ops MCP tools | A |
-| 3 | Chamber CLI | B (detonate, test), C (diff, heal, manifest) |
+| 3 | Chamber CLI | B (detonate, test, diff, heal), C (manifest) |
 | 4 | JSON shapes | B + C |
 | 5 | Verdict rules | B |
 | 6 | Room, decoys, tripwire | B |

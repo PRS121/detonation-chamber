@@ -23,7 +23,9 @@ JSON means the check did not complete: treat it as **INCONCLUSIVE**.
 | `bootstrap` (`sh bin/bootstrap.sh`) | none | `{node, npm, method, node_path}`; exit 1 if node/npm could not be installed |
 | `detonate` | `--repo <clone url> --base <sha or tag> --package <name> --to <spec> [--section dependencies\|devDependencies] [--run-tests]` | Verdict: `{room, package, from, to, verdict, severity, summary, findings[], network[], tampered[], install, tests, log_ok}` |
 | `test` | `--repo <clone url> --ref <sha> [--pin <name>=<spec>]…` (repeat `--pin` once per pin) | `{room, ref, pins, passed, failed, exit_code, install, verdict, findings[]}` |
-| `diff`, `heal`, `manifest` | see `docs/SPEC.md` §3 | owned by the Lab & Healer lane |
+| `diff` | `--package <name> --from <spec> --to <spec>` | `{files_added, files_changed, install_scripts:{before, after}, suspicious:[{file, line, kind, snippet}]}` — static, no install |
+| `heal` | `--repo <clone url> --base <sha or tag> --package <name> --bad <spec> [--section] [--bad-room <room>]` | `{status: HEALED\|NO_SAFE_VERSION\|INCONCLUSIVE, burned_room, candidates, safe, pin, fresh_room_clean, tests}` |
+| `manifest` | see `docs/SPEC.md` §3 | `{name, version, files, manifest_sha256}` (`lib/manifest.mjs`) |
 
 `detonate` makes a new room, clones the repo at `--base`, changes **only** `--package` to `--to`, and runs
 `npm install` **with install scripts on**, under the tripwire. `test` makes a new room, applies the pins, and
