@@ -1,0 +1,22 @@
+{
+  "name": "detonation-chamber",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.14"
+  },
+  "workspaces": [
+    "mcp/release-ops"
+  ],
+  "scripts": {
+    "mcp": "tsx --env-file-if-exists=.env mcp/release-ops/src/server.ts",
+    "agent:sync": "tsx --env-file-if-exists=.env agent/create-agent.ts",
+    "demo:seed": "tsx --env-file-if-exists=.env demo/seed.ts"
+  },
+  "dependencies": {
+    "@truefoundry/trueforge-sdk": "0.2.0"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15"
+  }
+}
